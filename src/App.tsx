@@ -100,26 +100,12 @@ function App() {
       <header className="relative z-20 bg-white/10 backdrop-blur-sm border-b border-white/20">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-center space-x-4">
-            {/* Tampa Bay Rays Logo */}
+            {/* Tampa Bay Rays Logo with simplified fallback */}
             <img 
-              src="/images/logos/rays-logo.png" 
+              src="/images/logos/rays-logo.png"
               alt="Tampa Bay Rays Logo" 
               className="w-16 h-16 object-contain"
-              onError={(e) => {
-                // Fallback to emoji if image fails to load
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-              }}
             />
-            <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center hidden">
-              <div className="w-8 h-8 flex items-center justify-center">
-                <img 
-                  src="/TB.png" 
-                  alt="TB Logo" 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            </div>
             <div className="text-center">
               <h1 className="text-3xl md:text-4xl font-bold text-white">
                 Tampa Bay Rays

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Prize } from '../types';
 import { Trophy, Shirt, Ticket, Percent, Gift } from 'lucide-react';
-import { supabase, ParticipantEntry } from '../lib/supabase';
+import { supabase, ParticipantEntry, isSupabaseAvailable, safeSupabaseOperation } from '../lib/supabase';
 import { UserData } from '../App';
 
 interface SlotMachineProps {
@@ -26,35 +26,31 @@ const SlotMachine: React.FC<SlotMachineProps> = ({ prizes, onPrizeWon, userName,
   };
 
   const saveParticipantEntry = async (wonPrize: Prize) => {
-    if (!supabase) {
-      console.warn('Supabase not connected. Entry not saved:', { prize: wonPrize });
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available. Entry not saved:', { prize: wonPrize });
       return;
     }
     
-    try {
-      const entry: Omit<ParticipantEntry, 'id'> = {
-        first_name: userData.firstName,
-        last_name: userData.lastName,
-        email: userData.email,
-        phone: userData.phone,
-        marketing_opt_in: userData.marketingOptIn,
-        prize_won: wonPrize.name,
-        prize_id: wonPrize.id,
-        entry_timestamp: new Date().toISOString(),
-        user_agent: navigator.userAgent
-      };
+    const entry: Omit<ParticipantEntry, 'id'> = {
+      first_name: userData.firstName,
+      last_name: userData.lastName,
+      email: userData.email,
+      phone: userData.phone,
+      marketing_opt_in: userData.marketingOptIn,
+      prize_won: wonPrize.name,
+      prize_id: wonPrize.id,
+      entry_timestamp: new Date().toISOString(),
+      user_agent: navigator.userAgent
+    };
 
-      const { error } = await supabase
-        .from('participants')
-        .insert([entry]);
+    const result = await safeSupabaseOperation(async () => {
+      const { error } = await supabase!.from('participants').insert([entry]);
+      if (error) throw error;
+      return true;
+    });
 
-      if (error) {
-        console.error('Error saving participant entry:', error);
-      } else {
-        console.log('Participant entry saved successfully');
-      }
-    } catch (error) {
-      console.error('Error saving participant entry:', error);
+    if (result) {
+      console.log('Participant entry saved successfully');
     }
   };
 
@@ -134,35 +130,73 @@ const SlotMachine: React.FC<SlotMachineProps> = ({ prizes, onPrizeWon, userName,
       <div className="relative w-24 h-32 md:w-32 md:h-40 bg-white rounded-lg shadow-lg border-4 border-gray-300 overflow-hidden">
         {/* Spinning Animation Overlay */}
         {spinningReels[reelIndex] && (
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/50 to-transparent animate-pulse z-10">
-            <div className="absolute inset-0 bg-gradient-to-b from-blue-500/20 via-transparent to-blue-500/20 animate-bounce"></div>
+          <div className="absolute inset-0 z-10">
+            {/* Spinning background effect */}
+            <div className="absolute inset-0 bg-gradient-to-b from-blue-500/30 via-transparent to-blue-500/30 animate-spin"></div>
+            {/* Pulsing overlay */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/50 to-transparent animate-pulse"></div>
           </div>
         )}
         
         {/* Reel Content */}
         <div 
-          className={`w-full h-full flex flex-col items-center justify-center transition-all duration-300 ${
-            spinningReels[reelIndex] ? 'animate-spin' : ''
-          }`}
+          className="w-full h-full flex flex-col items-center justify-center transition-all duration-300 relative z-20"
           style={{ backgroundColor: iconData.bgColor }}
         >
           {/* Prize Image with proper fallback */}
           <div className="w-8 h-8 md:w-12 md:h-12 mb-2 flex items-center justify-center">
             <img 
-              src={`/prize-${prizeId}.png`}
+              src={`/images/prizes/prize-${prizeId}.png`}
               alt={prize?.name || 'Prize'}
               className="w-full h-full object-contain"
               onError={(e) => {
-                console.log(`❌ Failed to load image: /prize-${prizeId}.png`);
-                console.log(`Full URL attempted: ${window.location.origin}/prize-${prizeId}.png`);
+                console.log(`❌ Failed to load image: /images/prizes/prize-${prizeId}.png`);
                 e.currentTarget.style.display = 'none';
                 const parent = e.currentTarget.parentElement;
                 if (parent) {
                   const IconComponent = iconData.icon;
+                  // Create React element and render it
+                  const iconElement = document.createElement('div');
+                  iconElement.className = 'w-full h-full flex items-center justify-center';
+                  iconElement.style.color = iconData.color;
+                  
+                  // Create SVG manually with proper Lucide icon path
+                  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                  svg.setAttribute('class', 'w-full h-full');
+                  svg.setAttribute('fill', 'none');
+                  svg.setAttribute('stroke', 'currentColor');
+                  svg.setAttribute('viewBox', '0 0 24 24');
+                  svg.setAttribute('stroke-width', '2');
+                  
+                  // Add the appropriate icon path based on prize type
+                  let iconPath = '';
+                  switch (prizeId) {
+                    case 1: // Trophy
+                      iconPath = 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6m0 5a2.5 2.5 0 0 1 0-5m0 5h12m-12 0v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9m0 0h1.5a2.5 2.5 0 0 0 0-5H18m0 5a2.5 2.5 0 0 1 0-5';
+                      break;
+                    case 2: // Shirt
+                      iconPath = 'M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z';
+                      break;
+                    case 3: // Ticket
+                      iconPath = 'M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2Z';
+                      break;
+                    case 4: // Percent
+                      iconPath = 'm19 5-14 14m5-13a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM15 19a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z';
+                      break;
+                    case 5: // Gift
+                      iconPath = 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 1 0-5C13 2 12 7 12 7z';
+                      break;
+                    default:
+                      iconPath = 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6m0 5a2.5 2.5 0 0 1 0-5m0 5h12m-12 0v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9m0 0h1.5a2.5 2.5 0 0 0 0-5H18m0 5a2.5 2.5 0 0 1 0-5';
+                  }
+                  
+                  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                  path.setAttribute('d', iconPath);
+                  svg.appendChild(path);
+                  iconElement.appendChild(svg);
+                  
                   parent.innerHTML = '';
-                  const iconDiv = document.createElement('div');
-                  iconDiv.innerHTML = `<svg class="w-full h-full" style="color: ${iconData.color}" fill="currentColor" viewBox="0 0 24 24"><use href="#icon-${prizeId}"></use></svg>`;
-                  parent.appendChild(iconDiv);
+                  parent.appendChild(iconElement);
                 }
               }}
             />
@@ -266,18 +300,53 @@ const SlotMachine: React.FC<SlotMachineProps> = ({ prizes, onPrizeWon, userName,
                 >
                   <div className="w-5 h-5 flex items-center justify-center">
                     <img 
-                      src={`/prize-${prize.id}.png`}
+                      src={`/images/prizes/prize-${prize.id}.png`}
                       alt={prize.name}
                       className="w-full h-full object-contain"
                       onError={(e) => {
-                        console.log(`Failed to load reference image: /prize-${prize.id}.png`);
+                        console.log(`Failed to load reference image: /images/prizes/prize-${prize.id}.png`);
                         e.currentTarget.style.display = 'none';
                         const parent = e.currentTarget.parentElement;
                         if (parent) {
-                          const IconComponent = iconData.icon;
-                          parent.innerHTML = '';
+                          // Create proper Lucide icon fallback
                           const iconElement = document.createElement('div');
-                          iconElement.innerHTML = `<div style="color: ${iconData.color}; width: 100%; height: 100%; display: flex; align-items: center; justify-center;">🏆</div>`;
+                          iconElement.className = 'w-full h-full flex items-center justify-center';
+                          iconElement.style.color = iconData.color;
+                          
+                          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                          svg.setAttribute('class', 'w-full h-full');
+                          svg.setAttribute('fill', 'none');
+                          svg.setAttribute('stroke', 'currentColor');
+                          svg.setAttribute('viewBox', '0 0 24 24');
+                          svg.setAttribute('stroke-width', '2');
+                          
+                          let iconPath = '';
+                          switch (prize.id) {
+                            case 1:
+                              iconPath = 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6m0 5a2.5 2.5 0 0 1 0-5m0 5h12m-12 0v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9m0 0h1.5a2.5 2.5 0 0 0 0-5H18m0 5a2.5 2.5 0 0 1 0-5';
+                              break;
+                            case 2:
+                              iconPath = 'M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z';
+                              break;
+                            case 3:
+                              iconPath = 'M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2Z';
+                              break;
+                            case 4:
+                              iconPath = 'm19 5-14 14m5-13a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM15 19a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z';
+                              break;
+                            case 5:
+                              iconPath = 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 1 0-5C13 2 12 7 12 7z';
+                              break;
+                            default:
+                              iconPath = 'M6 9H4.5a2.5 2.5 0 0 1 0-5H6m0 5a2.5 2.5 0 0 1 0-5m0 5h12m-12 0v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V9m0 0h1.5a2.5 2.5 0 0 0 0-5H18m0 5a2.5 2.5 0 0 1 0-5';
+                          }
+                          
+                          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                          path.setAttribute('d', iconPath);
+                          svg.appendChild(path);
+                          iconElement.appendChild(svg);
+                          
+                          parent.innerHTML = '';
                           parent.appendChild(iconElement);
                         }
                       }}

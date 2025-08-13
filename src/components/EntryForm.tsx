@@ -68,21 +68,11 @@ const EntryForm: React.FC<EntryFormProps> = ({ onSubmit }) => {
               <h2 className="text-2xl font-bold">Enter to Win!</h2>
               <p className="text-blue-200 mt-1">Spin the Rays Prize Wheel</p>
             </div>
-            {/* Tampa Bay Rays Logo */}
-            <img 
-              src="/images/logos/rays-logo.png" 
-              alt="Tampa Bay Rays Logo" 
-              className="w-12 h-12 object-contain"
-              onError={(e) => {
-                // Fallback to emoji if image fails to load
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-              }}
-            />
-            <div className="w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center hidden">
-              <div className="w-16 h-16 flex items-center justify-center">
+            {/* TB Logo in yellow circle */}
+            <div className="w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 flex items-center justify-center">
                 <img 
-                  src="/TB.png" 
+                  src="/images/logos/TB.png"
                   alt="TB Logo" 
                   className="w-full h-full object-contain"
                 />

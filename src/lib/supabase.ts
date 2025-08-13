@@ -11,6 +11,29 @@ export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null
 
+// Helper function to check if Supabase is available
+export const isSupabaseAvailable = (): boolean => {
+  return supabase !== null
+}
+
+// Helper function to safely execute Supabase operations
+export const safeSupabaseOperation = async <T>(
+  operation: () => Promise<T>,
+  fallback?: T
+): Promise<T | null> => {
+  if (!isSupabaseAvailable()) {
+    console.warn('Supabase not available. Operation skipped.')
+    return fallback || null
+  }
+  
+  try {
+    return await operation()
+  } catch (error) {
+    console.error('Supabase operation failed:', error)
+    return fallback || null
+  }
+}
+
 export interface ParticipantEntry {
   id?: string
   first_name: string

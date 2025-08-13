@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, ParticipantEntry } from '../lib/supabase';
+import { supabase, ParticipantEntry, isSupabaseAvailable, safeSupabaseOperation } from '../lib/supabase';
 import { Download, Users, Trophy, Calendar, Mail, Phone } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
@@ -16,26 +16,28 @@ const AdminDashboard: React.FC = () => {
   }, []);
 
   const fetchParticipants = async () => {
-    if (!supabase) {
-      console.warn('Supabase not connected. Cannot fetch participants.');
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available. Cannot fetch participants.');
+      setLoading(false);
       return;
     }
     
-    try {
-      const { data, error } = await supabase
+    const result = await safeSupabaseOperation(async () => {
+      const { data, error } = await supabase!
         .from('participants')
         .select('*')
         .order('entry_timestamp', { ascending: false });
 
       if (error) throw error;
+      return data || [];
+    }, []);
 
-      setParticipants(data || []);
-      calculateStats(data || []);
-    } catch (error) {
-      console.error('Error fetching participants:', error);
-    } finally {
-      setLoading(false);
+    if (result) {
+      setParticipants(result);
+      calculateStats(result);
     }
+    
+    setLoading(false);
   };
 
   const calculateStats = (data: ParticipantEntry[]) => {
@@ -89,7 +91,9 @@ const AdminDashboard: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading participant data...</p>
+          <p className="text-gray-600">
+            {isSupabaseAvailable() ? 'Loading participant data...' : 'Supabase not connected. Please set up database connection.'}
+          </p>
         </div>
       </div>
     );
